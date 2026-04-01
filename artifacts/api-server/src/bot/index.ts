@@ -3,13 +3,40 @@ import { db } from "@workspace/db";
 import { ordersTable, usersTable, settingsTable } from "@workspace/db";
 import { eq } from "drizzle-orm";
 import { logger } from "../lib/logger";
+import https from "https";
 
 const token = process.env.TELEGRAM_BOT_TOKEN;
 if (!token) {
   throw new Error("TELEGRAM_BOT_TOKEN is required");
 }
 
-export const bot = new TelegramBot(token, { polling: true });
+// Drop any existing webhook/polling session before starting
+function deleteWebhookAndDrop(): Promise<void> {
+  return new Promise((resolve) => {
+    const url = `https://api.telegram.org/bot${token}/deleteWebhook?drop_pending_updates=true`;
+    https.get(url, (res) => {
+      res.resume();
+      res.on("end", () => {
+        logger.info("Cleared existing Telegram webhook/session");
+        resolve();
+      });
+    }).on("error", () => resolve());
+  });
+}
+
+await deleteWebhookAndDrop();
+
+export const bot = new TelegramBot(token, {
+  polling: {
+    interval: 300,
+    autoStart: true,
+    params: { timeout: 10 },
+  },
+});
+
+bot.on("polling_error", (err) => {
+  logger.warn({ err: err.message }, "Telegram polling error — will retry");
+});
 
 const STAR_PACKAGES = [
   { stars: 50, price: 40 },
