@@ -20,8 +20,8 @@ RUN pnpm --filter @workspace/api-server run build
 
 FROM node:24-slim AS runner
 WORKDIR /app
-COPY --from=build /app /app
+COPY --from=build /app/artifacts/api-server/dist ./dist
 ENV NODE_ENV=production
 ENV PORT=8080
 EXPOSE 8080
-CMD ["node", "--enable-source-maps", "artifacts/api-server/dist/index.mjs"]
+CMD ["node", "--enable-source-maps", "./dist/index.mjs"]
