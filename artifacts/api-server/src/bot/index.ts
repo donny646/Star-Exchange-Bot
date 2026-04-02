@@ -113,11 +113,23 @@ function mainKeyboard(): TelegramBot.ReplyKeyboardMarkup {
 async function sendSubscriptionRequired(chatId: number) {
   if (!bot) return;
   const channelUsername = await getSetting("verification_channel");
-  const channelText = channelUsername ? `\n\n👉 Підпишіться на канал: ${channelUsername}` : "";
+
+  const inlineButtons: TelegramBot.InlineKeyboardButton[][] = [];
+
+  if (channelUsername) {
+    const channelLink = `https://t.me/${channelUsername.replace("@", "")}`;
+    inlineButtons.push([{ text: "📢 Підписатися на канал", url: channelLink }]);
+  }
+
+  inlineButtons.push([{ text: "✅ Я підписався — перевірити", callback_data: "check_sub" }]);
+
   await bot.sendMessage(
     chatId,
-    `❌ *Доступ заборонено*\n\nДля використання бота необхідно підписатися на наш канал.${channelText}\n\nПісля підписки натисніть /start`,
-    { parse_mode: "Markdown" }
+    `❌ *Доступ заборонено*\n\nДля використання бота необхідно підписатися на наш канал.\n\nПісля підписки натисніть кнопку нижче:`,
+    {
+      parse_mode: "Markdown",
+      reply_markup: { inline_keyboard: inlineButtons },
+    }
   );
 }
 
@@ -334,6 +346,31 @@ if (bot) {
 
       const data = query.data ?? "";
       const chatId = query.message?.chat.id;
+
+      if (data === "check_sub") {
+        const subscribed = await isUserSubscribed(query.from.id);
+        if (subscribed) {
+          await bot!.answerCallbackQuery(query.id, { text: "✅ Підписку підтверджено!" });
+          const telegramUserId = String(query.from.id);
+          const existing = await db.select().from(usersTable).where(eq(usersTable.telegramUserId, telegramUserId)).limit(1);
+          if (existing.length === 0) {
+            await db.insert(usersTable).values({
+              telegramUserId,
+              telegramUsername: query.from.username ?? null,
+              telegramFirstName: query.from.first_name ?? null,
+              telegramLastName: query.from.last_name ?? null,
+              isVerified: false,
+            });
+          }
+          await sendMainMenu(chatId!, query.from.first_name ?? "Користувач");
+        } else {
+          await bot!.answerCallbackQuery(query.id, {
+            text: "❌ Ви ще не підписані на канал",
+            show_alert: true,
+          });
+        }
+        return;
+      }
 
       if (data === "buy_custom") {
         const userId = String(query.from.id);
