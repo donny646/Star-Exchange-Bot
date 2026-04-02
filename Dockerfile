@@ -21,6 +21,7 @@ RUN pnpm --filter @workspace/api-server run build
 FROM node:24-slim AS runner
 WORKDIR /app
 COPY --from=build /app/artifacts/api-server/dist ./dist
+COPY --from=build /app/node_modules ./node_modules
 ENV NODE_ENV=production
 ENV PORT=8080
 EXPOSE 8080
