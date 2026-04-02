@@ -47,6 +47,7 @@ export interface Settings {
   card_number?: string;
   verification_channel?: string;
   admin_chat_id?: string;
+  admin_whitelist?: string;
 }
 
 export const api = {

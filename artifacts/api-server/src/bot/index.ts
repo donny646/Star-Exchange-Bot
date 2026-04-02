@@ -4,6 +4,11 @@ import { ordersTable, usersTable, settingsTable } from "@workspace/db";
 import { eq } from "drizzle-orm";
 import { logger } from "../lib/logger";
 import https from "https";
+import {
+  setupAdminHandlers,
+  handleAdminMessage,
+  handleAdminCallback,
+} from "./admin";
 
 const token = process.env.TELEGRAM_BOT_TOKEN;
 if (!token) {
@@ -268,6 +273,8 @@ if (bot) {
       const chatId = msg.chat.id;
       const userId = String(msg.from!.id);
 
+      if (await handleAdminMessage(bot, msg)) return;
+
       const subscribed = await isUserSubscribed(msg.from!.id);
       if (!subscribed) { await sendSubscriptionRequired(chatId); return; }
 
@@ -319,6 +326,8 @@ if (bot) {
 
   bot.on("callback_query", async (query) => {
     try {
+      if (await handleAdminCallback(bot, query)) return;
+
       const data = query.data ?? "";
       const chatId = query.message?.chat.id;
 
@@ -380,5 +389,6 @@ if (bot) {
     }
   });
 
+  setupAdminHandlers(bot);
   logger.info("Telegram bot started");
 }

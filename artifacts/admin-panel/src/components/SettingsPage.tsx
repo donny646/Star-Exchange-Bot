@@ -80,6 +80,22 @@ export function SettingsPage() {
               Telegram Chat ID для отримання сповіщень про нові замовлення. Дізнайтесь свій ID через @userinfobot.
             </p>
           </div>
+
+          <div>
+            <label className="block text-sm font-medium mb-1.5">
+              🔑 Адміни бота (доступ до /admin)
+            </label>
+            <input
+              type="text"
+              value={settings.admin_whitelist ?? ""}
+              onChange={(e) => setSettings({ ...settings, admin_whitelist: e.target.value })}
+              placeholder="123456789, 987654321"
+              className="w-full px-3 py-2 bg-background border border-input rounded-lg text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring text-sm"
+            />
+            <p className="text-xs text-muted-foreground mt-1">
+              Telegram User ID через кому. Ці акаунти матимуть доступ до адмін панелі бота через /admin.
+            </p>
+          </div>
         </div>
 
         <button
