@@ -137,25 +137,30 @@ async function sendNewOrders(bot: TelegramBot, chatId: number) {
       `👤 ${user} (ID: \`${order.telegramUserId}\`)\n` +
       `⭐ ${order.starsAmount} зірок • ${order.priceUah} грн\n` +
       `📊 ${statusLabel}\n` +
-      `📅 ${date}`;
+      `📅 ${date}` +
+      (order.proofCaption ? `\n💬 ${order.proofCaption}` : "");
 
-    await bot.sendMessage(chatId, text, {
-      parse_mode: "Markdown",
-      reply_markup: {
-        inline_keyboard: [
-          [
-            {
-              text: "✅ Виконано",
-              callback_data: `adm_complete_${order.id}`,
-            },
-            {
-              text: "❌ Скасувати",
-              callback_data: `adm_cancel_${order.id}`,
-            },
-          ],
+    const keyboard = {
+      inline_keyboard: [
+        [
+          { text: "✅ Виконано", callback_data: `adm_complete_${order.id}` },
+          { text: "❌ Скасувати", callback_data: `adm_cancel_${order.id}` },
         ],
-      },
-    });
+      ],
+    };
+
+    if (order.proofFileId) {
+      await bot.sendPhoto(chatId, order.proofFileId, {
+        caption: text,
+        parse_mode: "Markdown",
+        reply_markup: keyboard,
+      });
+    } else {
+      await bot.sendMessage(chatId, text, {
+        parse_mode: "Markdown",
+        reply_markup: keyboard,
+      });
+    }
   }
 
   await bot.sendMessage(chatId, `⬆️ Показано ${orders.length} замовлень`, {
