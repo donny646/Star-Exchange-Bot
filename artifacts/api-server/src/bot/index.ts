@@ -277,10 +277,15 @@ async function notifyAdmins(
     const text = `🔔 *Нова оплата!*\n\n📋 Замовлення: \`${orderNumber}\`\n👤 Користувач: ${firstName ?? ""} ${username ? "@" + username : ""} (ID: ${userId})\n⭐ Зірок: ${o.starsAmount}\n💰 Сума: ${o.priceUah} грн${caption ? `\n\n💬 Коментар: ${caption}` : ""}`;
 
     const keyboard = {
-      inline_keyboard: [[
-        { text: "✅ Виконано", callback_data: `complete_${orderNumber}` },
-        { text: "❌ Скасувати", callback_data: `cancel_${orderNumber}` },
-      ]],
+      inline_keyboard: [
+        [
+          { text: "✅ Виконано", callback_data: `complete_${orderNumber}` },
+          { text: "❌ Скасувати", callback_data: `cancel_${orderNumber}` },
+        ],
+        [
+          { text: "💬 Написати клієнту", callback_data: `adm_msg_${o.id}` },
+        ],
+      ],
     };
 
     for (const target of targets) {
