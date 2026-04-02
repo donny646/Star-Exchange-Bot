@@ -256,6 +256,43 @@ export function setupAdminHandlers(bot: TelegramBot) {
     }
   });
 
+  bot.onText(/\/checkverify$/, async (msg) => {
+    try {
+      const chatId = msg.chat.id;
+      const userId = msg.from!.id;
+
+      if (!(await isAdmin(userId))) {
+        await bot.sendMessage(chatId, "❌ У вас немає доступу до цієї команди.");
+        return;
+      }
+
+      const channelUsername = await getSetting("verification_channel");
+      if (!channelUsername) {
+        await bot.sendMessage(chatId, "⚠️ `verification_channel` не налаштовано в базі — перевірка вимкнена, всі користувачі проходять.", { parse_mode: "Markdown" });
+        return;
+      }
+
+      await bot.sendMessage(chatId, `🔍 Перевіряю канал: \`${channelUsername}\`\n\nПеревіряю ваш статус (ID: \`${userId}\`)...`, { parse_mode: "Markdown" });
+
+      try {
+        const member = await bot.getChatMember(channelUsername, userId);
+        await bot.sendMessage(
+          chatId,
+          `✅ *getChatMember працює!*\n\nВаш статус: \`${member.status}\`\n\nДозволені статуси: member, administrator, creator`,
+          { parse_mode: "Markdown" }
+        );
+      } catch (err: any) {
+        await bot.sendMessage(
+          chatId,
+          `❌ *getChatMember помилка:*\n\n\`${err?.message ?? String(err)}\``,
+          { parse_mode: "Markdown" }
+        );
+      }
+    } catch (err) {
+      logger.error({ err }, "Error in /checkverify");
+    }
+  });
+
   bot.onText(/\/addadmin(?:\s+(\d+))?$/, async (msg, match) => {
     try {
       const chatId = msg.chat.id;
