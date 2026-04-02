@@ -255,6 +255,51 @@ export function setupAdminHandlers(bot: TelegramBot) {
       logger.error({ err }, "Error in /admin command");
     }
   });
+
+  bot.onText(/\/addadmin(?:\s+(\d+))?$/, async (msg, match) => {
+    try {
+      const chatId = msg.chat.id;
+      const callerId = msg.from!.id;
+      const targetId = match?.[1];
+
+      if (!targetId) {
+        await bot.sendMessage(
+          chatId,
+          "ℹ️ Використання: `/addadmin <user_id>`\n\nДізнатись User ID можна через @userinfobot",
+          { parse_mode: "Markdown" }
+        );
+        return;
+      }
+
+      const whitelist = await getSetting("admin_whitelist");
+      const ids = whitelist
+        ? whitelist.split(",").map((id) => id.trim()).filter(Boolean)
+        : [];
+
+      // Allow bootstrap if whitelist is empty; otherwise require existing admin
+      if (ids.length > 0 && !ids.includes(String(callerId))) {
+        await bot.sendMessage(chatId, "❌ У вас немає доступу до цієї команди.");
+        return;
+      }
+
+      if (ids.includes(targetId)) {
+        await bot.sendMessage(chatId, `ℹ️ ID \`${targetId}\` вже є в списку адмінів.`, {
+          parse_mode: "Markdown",
+        });
+        return;
+      }
+
+      ids.push(targetId);
+      await setSetting("admin_whitelist", ids.join(", "));
+      await bot.sendMessage(
+        chatId,
+        `✅ Адміна \`${targetId}\` додано. Повний список: \`${ids.join(", ")}\``,
+        { parse_mode: "Markdown" }
+      );
+    } catch (err) {
+      logger.error({ err }, "Error in /addadmin command");
+    }
+  });
 }
 
 export async function handleAdminMessage(
