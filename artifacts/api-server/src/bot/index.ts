@@ -298,9 +298,10 @@ if (bot) {
       if (text === "⭐ Купити Зірки") {
         await sendBuyMenu(chatId);
       } else if (text === "💬 Відгуки") {
-        const reviewsLink = await getSetting("reviews_channel");
-        if (reviewsLink) {
-          await bot!.sendMessage(chatId, `💬 *Відгуки наших клієнтів*\n\nОзнайомтесь із відгуками покупців: ${reviewsLink}`, { parse_mode: "Markdown" });
+        const channelUsername = await getSetting("verification_channel");
+        if (channelUsername) {
+          const channelLink = `https://t.me/${channelUsername.replace("@", "")}`;
+          await bot!.sendMessage(chatId, `💬 *Відгуки наших клієнтів*\n\nОзнайомтесь із відгуками покупців: ${channelLink}`, { parse_mode: "Markdown" });
         } else {
           await bot!.sendMessage(chatId, `💬 *Відгуки*\n\nПосилання на канал з відгуками буде додане незабаром.`, { parse_mode: "Markdown" });
         }

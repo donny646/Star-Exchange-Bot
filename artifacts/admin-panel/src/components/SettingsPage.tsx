@@ -51,7 +51,7 @@ export function SettingsPage() {
 
           <div>
             <label className="block text-sm font-medium mb-1.5">
-              🔒 Канал для верифікації (підписка)
+              📢 Канал (відгуки та верифікація підписки)
             </label>
             <input
               type="text"
@@ -61,21 +61,8 @@ export function SettingsPage() {
               className="w-full px-3 py-2 bg-background border border-input rounded-lg text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring text-sm"
             />
             <p className="text-xs text-muted-foreground mt-1">
-              Користувачі повинні бути підписані на цей канал. Залиште порожнім, щоб відключити перевірку.
+              Використовується для розділу «Відгуки» та обов'язкової підписки. Залиште порожнім, щоб відключити перевірку.
             </p>
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium mb-1.5">
-              💬 Канал з відгуками
-            </label>
-            <input
-              type="text"
-              value={settings.reviews_channel ?? ""}
-              onChange={(e) => setSettings({ ...settings, reviews_channel: e.target.value })}
-              placeholder="https://t.me/your_reviews_channel"
-              className="w-full px-3 py-2 bg-background border border-input rounded-lg text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring text-sm"
-            />
           </div>
 
           <div>

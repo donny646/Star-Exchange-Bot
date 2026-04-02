@@ -46,7 +46,6 @@ export interface Stats {
 export interface Settings {
   card_number?: string;
   verification_channel?: string;
-  reviews_channel?: string;
   admin_chat_id?: string;
 }
 
