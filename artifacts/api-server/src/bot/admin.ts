@@ -4,13 +4,14 @@ import { ordersTable, settingsTable } from "@workspace/db";
 import { eq, desc, or, count } from "drizzle-orm";
 import { logger } from "../lib/logger";
 
-type AdminStep =
-  | "await_card"
-  | "await_channel"
-  | "await_admin_chat"
-  | "await_whitelist";
+type AdminStateData =
+  | { step: "await_card" | "await_channel" | "await_admin_chat" | "await_whitelist" }
+  | { step: "await_msg"; customerId: string; orderNumber: string };
 
-const adminState: Map<string, AdminStep> = new Map();
+const adminState: Map<string, AdminStateData> = new Map();
+
+// Maps customer userId → admin chatId for active conversations
+export const customerToAdmin: Map<string, number> = new Map();
 
 async function getSetting(key: string): Promise<string | null> {
   const result = await db
@@ -145,6 +146,9 @@ async function sendNewOrders(bot: TelegramBot, chatId: number) {
         [
           { text: "✅ Виконано", callback_data: `adm_complete_${order.id}` },
           { text: "❌ Скасувати", callback_data: `adm_cancel_${order.id}` },
+        ],
+        [
+          { text: "💬 Написати клієнту", callback_data: `adm_msg_${order.id}` },
         ],
       ],
     };
@@ -354,8 +358,8 @@ export async function handleAdminMessage(
   msg: TelegramBot.Message
 ): Promise<boolean> {
   const userId = String(msg.from!.id);
-  const step = adminState.get(userId);
-  if (!step) return false;
+  const stateData = adminState.get(userId);
+  if (!stateData) return false;
 
   const chatId = msg.chat.id;
   const text = msg.text?.trim();
@@ -363,31 +367,38 @@ export async function handleAdminMessage(
 
   adminState.delete(userId);
 
-  if (step === "await_card") {
+  if (stateData.step === "await_card") {
     await setSetting("card_number", text);
-    await bot.sendMessage(chatId, `✅ Номер картки оновлено: \`${text}\``, {
-      parse_mode: "Markdown",
-    });
-  } else if (step === "await_channel") {
+    await bot.sendMessage(chatId, `✅ Номер картки оновлено: \`${text}\``, { parse_mode: "Markdown" });
+    await sendAdminMenu(bot, chatId);
+  } else if (stateData.step === "await_channel") {
     await setSetting("verification_channel", text);
     await bot.sendMessage(chatId, `✅ Канал оновлено: ${text}`);
-  } else if (step === "await_admin_chat") {
+    await sendAdminMenu(bot, chatId);
+  } else if (stateData.step === "await_admin_chat") {
     await setSetting("admin_chat_id", text);
-    await bot.sendMessage(
-      chatId,
-      `✅ Admin Chat ID оновлено: \`${text}\``,
-      { parse_mode: "Markdown" }
-    );
-  } else if (step === "await_whitelist") {
+    await bot.sendMessage(chatId, `✅ Admin Chat ID оновлено: \`${text}\``, { parse_mode: "Markdown" });
+    await sendAdminMenu(bot, chatId);
+  } else if (stateData.step === "await_whitelist") {
     await setSetting("admin_whitelist", text);
-    await bot.sendMessage(
-      chatId,
-      `✅ Список адмінів оновлено: \`${text}\``,
-      { parse_mode: "Markdown" }
-    );
+    await bot.sendMessage(chatId, `✅ Список адмінів оновлено: \`${text}\``, { parse_mode: "Markdown" });
+    await sendAdminMenu(bot, chatId);
+  } else if (stateData.step === "await_msg") {
+    const { customerId, orderNumber } = stateData;
+    try {
+      await bot.sendMessage(
+        Number(customerId),
+        `📩 *Повідомлення від підтримки*\n_(Замовлення \`${orderNumber}\`)_\n\n${text}\n\n_Ви можете відповісти на це повідомлення прямо тут._`,
+        { parse_mode: "Markdown" }
+      );
+      // Open relay: customer replies will be forwarded back to this admin chat
+      customerToAdmin.set(customerId, chatId);
+      await bot.sendMessage(chatId, `✅ Повідомлення надіслано клієнту (ID: \`${customerId}\`).\n\nЯкщо клієнт відповість — ви отримаєте повідомлення тут.`, { parse_mode: "Markdown" });
+    } catch (err: any) {
+      await bot.sendMessage(chatId, `❌ Не вдалося надіслати повідомлення клієнту: ${err?.message}`);
+    }
   }
 
-  await sendAdminMenu(bot, chatId);
   return true;
 }
 
@@ -420,27 +431,39 @@ export async function handleAdminCallback(
     } else if (data === "adm_settings") {
       await sendSettingsMenu(bot, chatId);
     } else if (data === "adm_set_card") {
-      adminState.set(String(userId), "await_card");
+      adminState.set(String(userId), { step: "await_card" });
       await bot.sendMessage(chatId, "💳 Введіть новий номер картки:");
     } else if (data === "adm_set_channel") {
-      adminState.set(String(userId), "await_channel");
-      await bot.sendMessage(
-        chatId,
-        "📢 Введіть юзернейм каналу (наприклад @mychannel):"
-      );
+      adminState.set(String(userId), { step: "await_channel" });
+      await bot.sendMessage(chatId, "📢 Введіть юзернейм каналу (наприклад @mychannel):");
     } else if (data === "adm_set_adminchat") {
-      adminState.set(String(userId), "await_admin_chat");
-      await bot.sendMessage(
-        chatId,
-        "👨‍💼 Введіть Telegram Chat ID для сповіщень про замовлення:"
-      );
+      adminState.set(String(userId), { step: "await_admin_chat" });
+      await bot.sendMessage(chatId, "👨‍💼 Введіть Telegram Chat ID для сповіщень про замовлення:");
     } else if (data === "adm_set_whitelist") {
-      adminState.set(String(userId), "await_whitelist");
+      adminState.set(String(userId), { step: "await_whitelist" });
       await bot.sendMessage(
         chatId,
         "📝 Введіть Telegram User ID адмінів через кому:\n\n_Приклад: 123456789, 987654321_\n\nДізнатись свій ID можна через @userinfobot",
         { parse_mode: "Markdown" }
       );
+    } else if (data.startsWith("adm_msg_")) {
+      const id = Number(data.replace("adm_msg_", ""));
+      const orders = await db.select().from(ordersTable).where(eq(ordersTable.id, id)).limit(1);
+      if (!orders[0]) {
+        await bot.sendMessage(chatId, "❌ Замовлення не знайдено.");
+      } else {
+        const order = orders[0];
+        adminState.set(String(userId), {
+          step: "await_msg",
+          customerId: order.telegramUserId,
+          orderNumber: order.orderNumber,
+        });
+        await bot.sendMessage(
+          chatId,
+          `💬 Введіть повідомлення для клієнта\n_(Замовлення \`${order.orderNumber}\`, ID клієнта: \`${order.telegramUserId}\`)_\n\nКлієнт отримає його від імені бота і зможе відповісти:`,
+          { parse_mode: "Markdown" }
+        );
+      }
     } else if (data.startsWith("adm_complete_")) {
       const id = Number(data.replace("adm_complete_", ""));
       const updated = await db

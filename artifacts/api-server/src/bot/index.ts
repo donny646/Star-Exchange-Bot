@@ -8,6 +8,7 @@ import {
   setupAdminHandlers,
   handleAdminMessage,
   handleAdminCallback,
+  customerToAdmin,
 } from "./admin";
 
 const token = process.env.TELEGRAM_BOT_TOKEN;
@@ -305,6 +306,23 @@ if (bot) {
       const userId = String(msg.from!.id);
 
       if (await handleAdminMessage(bot, msg)) return;
+
+      // Relay customer reply back to the admin who messaged them
+      const adminChatId = customerToAdmin.get(userId);
+      if (adminChatId && msg.text && !msg.text.startsWith("/")) {
+        const userDisplay = [
+          msg.from?.first_name,
+          msg.from?.username ? `@${msg.from.username}` : null,
+          `(ID: ${userId})`,
+        ].filter(Boolean).join(" ");
+        await bot!.sendMessage(
+          adminChatId,
+          `📨 *Відповідь клієнта*\n👤 ${userDisplay}\n\n${msg.text}`,
+          { parse_mode: "Markdown" }
+        );
+        await bot!.sendMessage(chatId, "✅ Ваше повідомлення передано в підтримку.");
+        return;
+      }
 
       const subscribed = await isUserSubscribed(msg.from!.id);
       if (!subscribed) { await sendSubscriptionRequired(chatId); return; }
