@@ -307,7 +307,7 @@ if (bot) {
       } else if (text === "🛟 Служба Підтримки") {
         await bot!.sendMessage(
           chatId,
-          `🛟 *Служба Підтримки*\n\nЗверніться до наших операторів:\n\n👤 @obnali4it\n👤 @donnyadm\n\nМи відповімо якнайшвидше!`,
+          `🛟 *Служба Підтримки*\n\nЗверніться до наших адмінів:\n\n👤 @obnali4it\n👤 @donnyadm\n\nМи відповімо як найшвидше!`,
           { parse_mode: "Markdown" }
         );
       }
