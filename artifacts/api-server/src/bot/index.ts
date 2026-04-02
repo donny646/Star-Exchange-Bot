@@ -77,21 +77,10 @@ async function isUserSubscribed(userId: number): Promise<boolean> {
     const member = await bot.getChatMember(channelUsername, userId);
     return ["member", "administrator", "creator"].includes(member.status);
   } catch (err: any) {
-    const msg: string = err?.message ?? "";
-    if (
-      msg.includes("bot is not a member") ||
-      msg.includes("chat not found") ||
-      msg.includes("CHAT_ADMIN_REQUIRED") ||
-      msg.includes("have no rights") ||
-      msg.includes("Forbidden")
-    ) {
-      logger.warn(
-        { channel: channelUsername, err: msg },
-        "Bot cannot check channel membership — make sure the bot is added as an admin to the channel. Subscription check skipped."
-      );
-      return true;
-    }
-    logger.warn({ err: msg }, "isUserSubscribed error — denying access");
+    logger.warn(
+      { channel: channelUsername, err: err?.message },
+      "getChatMember failed — bot must be an admin of the channel"
+    );
     return false;
   }
 }
