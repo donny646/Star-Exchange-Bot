@@ -69,17 +69,29 @@ async function generateOrderNumber(): Promise<string> {
   return `ORD-${year}${month}${day}-${random}`;
 }
 
+function normalizeChannel(raw: string): string {
+  // Strip https://t.me/ or t.me/ prefix if someone pasted a link
+  let ch = raw.trim().replace(/^https?:\/\/t\.me\//i, "").replace(/^t\.me\//i, "");
+  // Numeric chat ID — return as-is
+  if (/^-?\d+$/.test(ch)) return ch;
+  // Ensure @username format
+  if (!ch.startsWith("@")) ch = "@" + ch;
+  return ch;
+}
+
 async function isUserSubscribed(userId: number): Promise<boolean> {
   if (!bot) return true;
-  const channelUsername = await getSetting("verification_channel");
-  if (!channelUsername) return true;
+  const raw = await getSetting("verification_channel");
+  if (!raw) return true;
+  const channelId = normalizeChannel(raw);
   try {
-    const member = await bot.getChatMember(channelUsername, userId);
+    const member = await bot.getChatMember(channelId, userId);
+    logger.info({ channelId, userId, status: member.status }, "getChatMember result");
     return ["member", "administrator", "creator"].includes(member.status);
   } catch (err: any) {
     logger.warn(
-      { channel: channelUsername, err: err?.message },
-      "getChatMember failed — bot must be an admin of the channel"
+      { channelId, userId, err: err?.message },
+      "getChatMember failed — check bot is admin of channel and channel value is correct"
     );
     return false;
   }
@@ -117,7 +129,10 @@ async function sendSubscriptionRequired(chatId: number) {
   const inlineButtons: TelegramBot.InlineKeyboardButton[][] = [];
 
   if (channelUsername) {
-    const channelLink = `https://t.me/${channelUsername.replace("@", "")}`;
+    const domain = normalizeChannel(channelUsername).replace("@", "");
+    const channelLink = /^-?\d+$/.test(domain)
+      ? `https://t.me/c/${domain.replace("-100", "")}`
+      : `tg://resolve?domain=${domain}`;
     inlineButtons.push([{ text: "📢 Підписатися на канал", url: channelLink }]);
   }
 

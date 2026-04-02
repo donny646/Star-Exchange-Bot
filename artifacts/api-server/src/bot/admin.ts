@@ -266,13 +266,18 @@ export function setupAdminHandlers(bot: TelegramBot) {
         return;
       }
 
-      const channelUsername = await getSetting("verification_channel");
-      if (!channelUsername) {
+      const rawChannel = await getSetting("verification_channel");
+      if (!rawChannel) {
         await bot.sendMessage(chatId, "⚠️ `verification_channel` не налаштовано в базі — перевірка вимкнена, всі користувачі проходять.", { parse_mode: "Markdown" });
         return;
       }
 
-      await bot.sendMessage(chatId, `🔍 Перевіряю канал: \`${channelUsername}\`\n\nПеревіряю ваш статус (ID: \`${userId}\`)...`, { parse_mode: "Markdown" });
+      let channelUsername = rawChannel.trim().replace(/^https?:\/\/t\.me\//i, "").replace(/^t\.me\//i, "");
+      if (!/^-?\d+$/.test(channelUsername) && !channelUsername.startsWith("@")) {
+        channelUsername = "@" + channelUsername;
+      }
+
+      await bot.sendMessage(chatId, `🔍 Канал у базі: \`${rawChannel}\`\nНормалізовано: \`${channelUsername}\`\n\nПеревіряю ваш статус (ID: \`${userId}\`)...`, { parse_mode: "Markdown" });
 
       try {
         const member = await bot.getChatMember(channelUsername, userId);
