@@ -7,11 +7,12 @@ import https from "https";
 
 const token = process.env.TELEGRAM_BOT_TOKEN;
 if (!token) {
-  throw new Error("TELEGRAM_BOT_TOKEN is required");
+  logger.warn("TELEGRAM_BOT_TOKEN is not set — Telegram bot will not start");
 }
 
 // Drop any existing webhook/polling session before starting
 function deleteWebhookAndDrop(): Promise<void> {
+  if (!token) return Promise.resolve();
   return new Promise((resolve) => {
     const url = `https://api.telegram.org/bot${token}/deleteWebhook?drop_pending_updates=true`;
     https.get(url, (res) => {
@@ -24,19 +25,23 @@ function deleteWebhookAndDrop(): Promise<void> {
   });
 }
 
-await deleteWebhookAndDrop();
+if (token) {
+  await deleteWebhookAndDrop();
+}
 
-export const bot = new TelegramBot(token, {
+export const bot = token ? new TelegramBot(token, {
   polling: {
     interval: 300,
     autoStart: true,
     params: { timeout: 10 },
   },
-});
+}) : null;
 
-bot.on("polling_error", (err) => {
-  logger.warn({ err: err.message }, "Telegram polling error — will retry");
-});
+if (bot) {
+  bot.on("polling_error", (err) => {
+    logger.warn({ err: err.message }, "Telegram polling error — will retry");
+  });
+}
 
 const STAR_PACKAGES = [
   { stars: 50, price: 40 },
@@ -60,6 +65,7 @@ async function generateOrderNumber(): Promise<string> {
 }
 
 async function isUserSubscribed(userId: number): Promise<boolean> {
+  if (!bot) return true;
   const channelUsername = await getSetting("verification_channel");
   if (!channelUsername) return true;
   try {
@@ -96,6 +102,7 @@ function mainKeyboard(): TelegramBot.ReplyKeyboardMarkup {
 }
 
 async function sendSubscriptionRequired(chatId: number) {
+  if (!bot) return;
   const channelUsername = await getSetting("verification_channel");
   const channelText = channelUsername ? `\n\n👉 Підпишіться на канал: ${channelUsername}` : "";
   await bot.sendMessage(
@@ -106,6 +113,7 @@ async function sendSubscriptionRequired(chatId: number) {
 }
 
 async function sendMainMenu(chatId: number, firstName: string) {
+  if (!bot) return;
   await bot.sendMessage(
     chatId,
     `👋 Привіт, *${firstName}*!\n\nЯ допоможу вам купити *Telegram Зірки* ⭐\n\nОберіть дію нижче:`,
@@ -114,6 +122,7 @@ async function sendMainMenu(chatId: number, firstName: string) {
 }
 
 async function sendBuyMenu(chatId: number) {
+  if (!bot) return;
   const buttons: TelegramBot.InlineKeyboardButton[][] = STAR_PACKAGES.map((pkg) => [
     { text: `⭐ ${pkg.stars} зірок — ${pkg.price} грн`, callback_data: `buy_${pkg.stars}_${pkg.price}` },
   ]);
@@ -132,6 +141,7 @@ async function sendOrderDetails(
   username: string | null,
   firstName: string | null
 ) {
+  if (!bot) return;
   const cardNumber = await getSetting("card_number");
   const orderNumber = await generateOrderNumber();
 
@@ -164,6 +174,7 @@ async function handleProofMedia(
   firstName: string | null,
   username: string | null
 ) {
+  if (!bot) return;
   const pendingOrders = await db
     .select()
     .from(ordersTable)
@@ -205,6 +216,7 @@ async function notifyAdmins(
   firstName: string | null,
   username: string | null
 ) {
+  if (!bot) return;
   const adminChatId = await getSetting("admin_chat_id");
   if (!adminChatId) return;
 
@@ -234,136 +246,138 @@ async function notifyAdmins(
 
 const userAwaitingCustomStars: Map<string, boolean> = new Map();
 
-bot.onText(/\/start/, async (msg) => {
-  try {
-    const chatId = msg.chat.id;
-    const userId = msg.from!.id;
-    const firstName = msg.from?.first_name ?? "Користувач";
+if (bot) {
+  bot.onText(/\/start/, async (msg) => {
+    try {
+      const chatId = msg.chat.id;
+      const userId = msg.from!.id;
+      const firstName = msg.from?.first_name ?? "Користувач";
 
-    const subscribed = await isUserSubscribed(userId);
-    if (!subscribed) { await sendSubscriptionRequired(chatId); return; }
+      const subscribed = await isUserSubscribed(userId);
+      if (!subscribed) { await sendSubscriptionRequired(chatId); return; }
 
-    await getOrCreateUser(msg);
-    await sendMainMenu(chatId, firstName);
-  } catch (err) {
-    logger.error({ err }, "Error handling /start");
-  }
-});
-
-bot.on("message", async (msg) => {
-  try {
-    const chatId = msg.chat.id;
-    const userId = String(msg.from!.id);
-
-    const subscribed = await isUserSubscribed(msg.from!.id);
-    if (!subscribed) { await sendSubscriptionRequired(chatId); return; }
-
-    if (msg.photo || msg.document) {
-      const fileId = msg.photo
-        ? msg.photo[msg.photo.length - 1].file_id
-        : msg.document?.file_id ?? null;
-      await handleProofMedia(chatId, userId, fileId, msg.caption ?? null, msg.from?.first_name ?? null, msg.from?.username ?? null);
-      return;
+      await getOrCreateUser(msg);
+      await sendMainMenu(chatId, firstName);
+    } catch (err) {
+      logger.error({ err }, "Error handling /start");
     }
+  });
 
-    if (!msg.text || msg.text.startsWith("/")) return;
+  bot.on("message", async (msg) => {
+    try {
+      const chatId = msg.chat.id;
+      const userId = String(msg.from!.id);
 
-    const text = msg.text;
+      const subscribed = await isUserSubscribed(msg.from!.id);
+      if (!subscribed) { await sendSubscriptionRequired(chatId); return; }
 
-    if (userAwaitingCustomStars.get(userId)) {
-      const stars = parseInt(text.trim());
-      if (isNaN(stars) || stars < 10) {
-        await bot.sendMessage(chatId, "❌ Введіть коректну кількість зірок (мінімум 10).");
+      if (msg.photo || msg.document) {
+        const fileId = msg.photo
+          ? msg.photo[msg.photo.length - 1].file_id
+          : msg.document?.file_id ?? null;
+        await handleProofMedia(chatId, userId, fileId, msg.caption ?? null, msg.from?.first_name ?? null, msg.from?.username ?? null);
         return;
       }
-      userAwaitingCustomStars.delete(userId);
-      const price = Math.ceil(stars * 0.78);
-      await sendOrderDetails(chatId, stars, price, userId, msg.from?.username ?? null, msg.from?.first_name ?? null);
-      return;
-    }
 
-    if (text === "⭐ Купити Зірки") {
-      await sendBuyMenu(chatId);
-    } else if (text === "💬 Відгуки") {
-      const reviewsLink = await getSetting("reviews_channel");
-      if (reviewsLink) {
-        await bot.sendMessage(chatId, `💬 *Відгуки наших клієнтів*\n\nОзнайомтесь із відгуками покупців: ${reviewsLink}`, { parse_mode: "Markdown" });
-      } else {
-        await bot.sendMessage(chatId, `💬 *Відгуки*\n\nПосилання на канал з відгуками буде додане незабаром.`, { parse_mode: "Markdown" });
+      if (!msg.text || msg.text.startsWith("/")) return;
+
+      const text = msg.text;
+
+      if (userAwaitingCustomStars.get(userId)) {
+        const stars = parseInt(text.trim());
+        if (isNaN(stars) || stars < 10) {
+          await bot!.sendMessage(chatId, "❌ Введіть коректну кількість зірок (мінімум 10).");
+          return;
+        }
+        userAwaitingCustomStars.delete(userId);
+        const price = Math.ceil(stars * 0.78);
+        await sendOrderDetails(chatId, stars, price, userId, msg.from?.username ?? null, msg.from?.first_name ?? null);
+        return;
       }
-    } else if (text === "🛟 Служба Підтримки") {
-      await bot.sendMessage(
-        chatId,
-        `🛟 *Служба Підтримки*\n\nЗверніться до наших операторів:\n\n👤 @obnali4it\n👤 @donnyadm\n\nМи відповімо якнайшвидше!`,
-        { parse_mode: "Markdown" }
-      );
-    }
-  } catch (err) {
-    logger.error({ err }, "Error handling message");
-  }
-});
 
-bot.on("callback_query", async (query) => {
-  try {
-    const data = query.data ?? "";
-    const chatId = query.message?.chat.id;
-
-    if (data === "buy_custom") {
-      const userId = String(query.from.id);
-      userAwaitingCustomStars.set(userId, true);
-      await bot.answerCallbackQuery(query.id);
-      await bot.sendMessage(chatId!, `✏️ Введіть кількість зірок, яку хочете купити (мінімум 10):\n\n_Ціна розраховується: кількість × 0.78 грн_`, { parse_mode: "Markdown" });
-      return;
-    }
-
-    if (data.startsWith("buy_")) {
-      const parts = data.split("_");
-      const stars = parseInt(parts[1]);
-      const price = parseInt(parts[2]);
-      const userId = String(query.from.id);
-      await bot.answerCallbackQuery(query.id);
-      await sendOrderDetails(chatId!, stars, price, userId, query.from.username ?? null, query.from.first_name ?? null);
-      return;
-    }
-
-    if (data.startsWith("complete_")) {
-      const orderNumber = data.replace("complete_", "");
-      await db.update(ordersTable).set({ status: "completed", updatedAt: new Date() }).where(eq(ordersTable.orderNumber, orderNumber));
-      const orders = await db.select().from(ordersTable).where(eq(ordersTable.orderNumber, orderNumber)).limit(1);
-      if (orders[0]) {
-        try {
-          await bot.sendMessage(
-            Number(orders[0].telegramUserId),
-            `🎉 *Замовлення виконано!*\n\n📋 Замовлення: \`${orderNumber}\`\n⭐ Зірки (${orders[0].starsAmount}) надіслані на ваш акаунт!\n\nДякуємо за покупку! 🙏`,
-            { parse_mode: "Markdown" }
-          );
-        } catch {}
+      if (text === "⭐ Купити Зірки") {
+        await sendBuyMenu(chatId);
+      } else if (text === "💬 Відгуки") {
+        const reviewsLink = await getSetting("reviews_channel");
+        if (reviewsLink) {
+          await bot!.sendMessage(chatId, `💬 *Відгуки наших клієнтів*\n\nОзнайомтесь із відгуками покупців: ${reviewsLink}`, { parse_mode: "Markdown" });
+        } else {
+          await bot!.sendMessage(chatId, `💬 *Відгуки*\n\nПосилання на канал з відгуками буде додане незабаром.`, { parse_mode: "Markdown" });
+        }
+      } else if (text === "🛟 Служба Підтримки") {
+        await bot!.sendMessage(
+          chatId,
+          `🛟 *Служба Підтримки*\n\nЗверніться до наших операторів:\n\n👤 @obnali4it\n👤 @donnyadm\n\nМи відповімо якнайшвидше!`,
+          { parse_mode: "Markdown" }
+        );
       }
-      await bot.answerCallbackQuery(query.id, { text: "✅ Замовлення виконано!" });
-      return;
+    } catch (err) {
+      logger.error({ err }, "Error handling message");
     }
+  });
 
-    if (data.startsWith("cancel_")) {
-      const orderNumber = data.replace("cancel_", "");
-      await db.update(ordersTable).set({ status: "cancelled", updatedAt: new Date() }).where(eq(ordersTable.orderNumber, orderNumber));
-      const orders = await db.select().from(ordersTable).where(eq(ordersTable.orderNumber, orderNumber)).limit(1);
-      if (orders[0]) {
-        try {
-          await bot.sendMessage(
-            Number(orders[0].telegramUserId),
-            `❌ *Замовлення скасовано*\n\n📋 Замовлення: \`${orderNumber}\`\n\nЯкщо є питання — зверніться до підтримки:\n👤 @obnali4it\n👤 @donnyadm`,
-            { parse_mode: "Markdown" }
-          );
-        } catch {}
+  bot.on("callback_query", async (query) => {
+    try {
+      const data = query.data ?? "";
+      const chatId = query.message?.chat.id;
+
+      if (data === "buy_custom") {
+        const userId = String(query.from.id);
+        userAwaitingCustomStars.set(userId, true);
+        await bot!.answerCallbackQuery(query.id);
+        await bot!.sendMessage(chatId!, `✏️ Введіть кількість зірок, яку хочете купити (мінімум 10):\n\n_Ціна розраховується: кількість × 0.78 грн_`, { parse_mode: "Markdown" });
+        return;
       }
-      await bot.answerCallbackQuery(query.id, { text: "❌ Замовлення скасовано" });
-      return;
+
+      if (data.startsWith("buy_")) {
+        const parts = data.split("_");
+        const stars = parseInt(parts[1]);
+        const price = parseInt(parts[2]);
+        const userId = String(query.from.id);
+        await bot!.answerCallbackQuery(query.id);
+        await sendOrderDetails(chatId!, stars, price, userId, query.from.username ?? null, query.from.first_name ?? null);
+        return;
+      }
+
+      if (data.startsWith("complete_")) {
+        const orderNumber = data.replace("complete_", "");
+        await db.update(ordersTable).set({ status: "completed", updatedAt: new Date() }).where(eq(ordersTable.orderNumber, orderNumber));
+        const orders = await db.select().from(ordersTable).where(eq(ordersTable.orderNumber, orderNumber)).limit(1);
+        if (orders[0]) {
+          try {
+            await bot!.sendMessage(
+              Number(orders[0].telegramUserId),
+              `🎉 *Замовлення виконано!*\n\n📋 Замовлення: \`${orderNumber}\`\n⭐ Зірки (${orders[0].starsAmount}) надіслані на ваш акаунт!\n\nДякуємо за покупку! 🙏`,
+              { parse_mode: "Markdown" }
+            );
+          } catch {}
+        }
+        await bot!.answerCallbackQuery(query.id, { text: "✅ Замовлення виконано!" });
+        return;
+      }
+
+      if (data.startsWith("cancel_")) {
+        const orderNumber = data.replace("cancel_", "");
+        await db.update(ordersTable).set({ status: "cancelled", updatedAt: new Date() }).where(eq(ordersTable.orderNumber, orderNumber));
+        const orders = await db.select().from(ordersTable).where(eq(ordersTable.orderNumber, orderNumber)).limit(1);
+        if (orders[0]) {
+          try {
+            await bot!.sendMessage(
+              Number(orders[0].telegramUserId),
+              `❌ *Замовлення скасовано*\n\n📋 Замовлення: \`${orderNumber}\`\n\nЯкщо є питання — зверніться до підтримки:\n👤 @obnali4it\n👤 @donnyadm`,
+              { parse_mode: "Markdown" }
+            );
+          } catch {}
+        }
+        await bot!.answerCallbackQuery(query.id, { text: "❌ Замовлення скасовано" });
+        return;
+      }
+
+      await bot!.answerCallbackQuery(query.id);
+    } catch (err) {
+      logger.error({ err }, "Error handling callback query");
     }
+  });
 
-    await bot.answerCallbackQuery(query.id);
-  } catch (err) {
-    logger.error({ err }, "Error handling callback query");
-  }
-});
-
-logger.info("Telegram bot started");
+  logger.info("Telegram bot started");
+}
