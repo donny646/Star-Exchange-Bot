@@ -254,8 +254,20 @@ async function notifyAdmins(
   username: string | null
 ) {
   if (!bot) return;
+
+  // Collect all unique admin chat IDs from both admin_chat_id and admin_whitelist
+  const targets = new Set<number>();
   const adminChatId = await getSetting("admin_chat_id");
-  if (!adminChatId) return;
+  if (adminChatId) targets.add(Number(adminChatId));
+  const whitelist = await getSetting("admin_whitelist");
+  if (whitelist) {
+    for (const id of whitelist.split(",").map((s) => s.trim()).filter(Boolean)) {
+      const n = Number(id);
+      if (!isNaN(n)) targets.add(n);
+    }
+  }
+
+  if (targets.size === 0) return;
 
   try {
     const order = await db.select().from(ordersTable).where(eq(ordersTable.orderNumber, orderNumber)).limit(1);
@@ -271,10 +283,16 @@ async function notifyAdmins(
       ]],
     };
 
-    if (fileId) {
-      await bot.sendPhoto(Number(adminChatId), fileId, { caption: text, parse_mode: "Markdown", reply_markup: keyboard });
-    } else {
-      await bot.sendMessage(Number(adminChatId), text, { parse_mode: "Markdown", reply_markup: keyboard });
+    for (const target of targets) {
+      try {
+        if (fileId) {
+          await bot.sendPhoto(target, fileId, { caption: text, parse_mode: "Markdown", reply_markup: keyboard });
+        } else {
+          await bot.sendMessage(target, text, { parse_mode: "Markdown", reply_markup: keyboard });
+        }
+      } catch (err) {
+        logger.warn({ err, target }, "Failed to notify admin");
+      }
     }
   } catch (err) {
     logger.error({ err }, "Error notifying admins");
