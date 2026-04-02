@@ -9,6 +9,7 @@ import {
   handleAdminMessage,
   handleAdminCallback,
   customerToAdmin,
+  customerReplyMode,
 } from "./admin";
 
 const token = process.env.TELEGRAM_BOT_TOKEN;
@@ -330,20 +331,26 @@ if (bot) {
 
       if (await handleAdminMessage(bot, msg)) return;
 
-      // Relay customer reply back to the admin who messaged them
-      const adminChatId = customerToAdmin.get(userId);
-      if (adminChatId && msg.text && !msg.text.startsWith("/")) {
-        const userDisplay = [
-          msg.from?.first_name,
-          msg.from?.username ? `@${msg.from.username}` : null,
-          `(ID: ${userId})`,
-        ].filter(Boolean).join(" ");
+      // Relay customer reply if they pressed "Відповісти адміну"
+      if (customerReplyMode.has(userId) && msg.text && !msg.text.startsWith("/")) {
+        const adminChatId = customerToAdmin.get(userId);
+        if (adminChatId) {
+          const userDisplay = [
+            msg.from?.first_name,
+            msg.from?.username ? `@${msg.from.username}` : null,
+            `(ID: ${userId})`,
+          ].filter(Boolean).join(" ");
+          await bot!.sendMessage(
+            adminChatId,
+            `📨 *Відповідь клієнта*\n👤 ${userDisplay}\n\n${msg.text}`,
+            { parse_mode: "Markdown" }
+          );
+        }
+        customerReplyMode.delete(userId);
         await bot!.sendMessage(
-          adminChatId,
-          `📨 *Відповідь клієнта*\n👤 ${userDisplay}\n\n${msg.text}`,
-          { parse_mode: "Markdown" }
+          chatId,
+          "✅ Ваше повідомлення передано в підтримку.\n\nЩоб надіслати ще одне — натисніть кнопку «↩️ Відповісти адміну» знову."
         );
-        await bot!.sendMessage(chatId, "✅ Ваше повідомлення передано в підтримку.");
         return;
       }
 
@@ -402,6 +409,21 @@ if (bot) {
 
       const data = query.data ?? "";
       const chatId = query.message?.chat.id;
+
+      if (data === "reply_admin") {
+        const customerId = String(query.from.id);
+        if (!customerToAdmin.has(customerId)) {
+          await bot!.answerCallbackQuery(query.id, {
+            text: "❌ Немає активного діалогу з підтримкою",
+            show_alert: true,
+          });
+          return;
+        }
+        customerReplyMode.add(customerId);
+        await bot!.answerCallbackQuery(query.id, { text: "✍️ Введіть ваше повідомлення" });
+        await bot!.sendMessage(chatId!, "✍️ Введіть ваше повідомлення для підтримки:");
+        return;
+      }
 
       if (data === "check_sub") {
         const subscribed = await isUserSubscribed(query.from.id);

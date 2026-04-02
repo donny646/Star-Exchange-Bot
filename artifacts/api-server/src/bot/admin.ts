@@ -13,6 +13,9 @@ const adminState: Map<string, AdminStateData> = new Map();
 // Maps customer userId → admin chatId for active conversations
 export const customerToAdmin: Map<string, number> = new Map();
 
+// Customers who pressed "Відповісти адміну" and are ready to send one message
+export const customerReplyMode: Set<string> = new Set();
+
 async function getSetting(key: string): Promise<string | null> {
   const result = await db
     .select()
@@ -388,12 +391,17 @@ export async function handleAdminMessage(
     try {
       await bot.sendMessage(
         Number(customerId),
-        `📩 *Повідомлення від підтримки*\n_(Замовлення \`${orderNumber}\`)_\n\n${text}\n\n_Ви можете відповісти на це повідомлення прямо тут._`,
-        { parse_mode: "Markdown" }
+        `📩 *Повідомлення від підтримки*\n_(Замовлення \`${orderNumber}\`)_\n\n${text}`,
+        {
+          parse_mode: "Markdown",
+          reply_markup: {
+            inline_keyboard: [[{ text: "↩️ Відповісти адміну", callback_data: "reply_admin" }]],
+          },
+        }
       );
-      // Open relay: customer replies will be forwarded back to this admin chat
+      // Link customer → admin chat for relaying replies
       customerToAdmin.set(customerId, chatId);
-      await bot.sendMessage(chatId, `✅ Повідомлення надіслано клієнту (ID: \`${customerId}\`).\n\nЯкщо клієнт відповість — ви отримаєте повідомлення тут.`, { parse_mode: "Markdown" });
+      await bot.sendMessage(chatId, `✅ Повідомлення надіслано клієнту (ID: \`${customerId}\`).\n\nЯкщо клієнт натисне «Відповісти адміну» — ви отримаєте відповідь тут.`, { parse_mode: "Markdown" });
     } catch (err: any) {
       await bot.sendMessage(chatId, `❌ Не вдалося надіслати повідомлення клієнту: ${err?.message}`);
     }
