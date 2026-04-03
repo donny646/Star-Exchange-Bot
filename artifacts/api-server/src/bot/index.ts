@@ -513,9 +513,10 @@ if (bot) {
         return;
       }
 
-      if (data === "leave_review") {
+      if (data.startsWith("leave_review")) {
         const userId = String(query.from.id);
-        userAwaitingFeedback.set(userId, "pending");
+        const stars = data.split("_")[2] ?? "0";
+        userAwaitingFeedback.set(userId, stars);
         await bot!.answerCallbackQuery(query.id, { text: "✍️ Напишіть свій відгук" });
         await bot!.sendMessage(
           chatId!,
@@ -537,7 +538,7 @@ if (bot) {
               {
                 parse_mode: "Markdown",
                 reply_markup: {
-                  inline_keyboard: [[{ text: "💬 Залишити відгук", callback_data: "leave_review" }]],
+                  inline_keyboard: [[{ text: "💬 Залишити відгук", callback_data: `leave_review_${orders[0].starsAmount}` }]],
                 },
               }
             );
