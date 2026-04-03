@@ -357,22 +357,39 @@ if (bot) {
 
       // Handle feedback submission
       if (userAwaitingFeedback.has(userId)) {
+        const starsAmount = userAwaitingFeedback.get(userId) ?? "0";
         userAwaitingFeedback.delete(userId);
         const channelUsername = await getSetting("verification_channel");
         if (channelUsername) {
           const channelId = normalizeChannel(channelUsername);
+
+          // Increment persistent feedback counter
+          const currentCount = parseInt((await getSetting("feedback_count")) ?? "0");
+          const feedbackNumber = currentCount + 1;
+          await db.insert(settingsTable).values({ key: "feedback_count", value: String(feedbackNumber) })
+            .onConflictDoUpdate({ target: settingsTable.key, set: { value: String(feedbackNumber) } });
+
+          // Format date as DD.MM.YY
+          const now = new Date();
+          const day = String(now.getDate()).padStart(2, "0");
+          const month = String(now.getMonth() + 1).padStart(2, "0");
+          const year = String(now.getFullYear()).slice(-2);
+          const dateStr = `${day}.${month}.${year}`;
+
           const name = msg.from?.first_name ?? "Покупець";
           const tag = msg.from?.username ? ` (@${msg.from.username})` : "";
           const reviewText = msg.text ?? msg.caption ?? "";
-          const header = `⭐ *Відгук від ${name}${tag}*${reviewText ? `\n\n${reviewText}` : ""}`;
+
+          const postText = `📊 №${feedbackNumber} ⭐️\n\n🆔 Клієнт: ${name}${tag}\n📝 Коментар: ${reviewText}\n\nДата: ${dateStr}\n\nКуплено: ${starsAmount} ⭐️`;
+
           try {
             if (msg.photo) {
               const fileId = msg.photo[msg.photo.length - 1].file_id;
-              await bot!.sendPhoto(channelId, fileId, { caption: header, parse_mode: "Markdown" });
+              await bot!.sendPhoto(channelId, fileId, { caption: postText, parse_mode: "Markdown" });
             } else if (msg.document) {
-              await bot!.sendDocument(channelId, msg.document.file_id, { caption: header, parse_mode: "Markdown" });
-            } else if (msg.text) {
-              await bot!.sendMessage(channelId, header, { parse_mode: "Markdown" });
+              await bot!.sendDocument(channelId, msg.document.file_id, { caption: postText, parse_mode: "Markdown" });
+            } else {
+              await bot!.sendMessage(channelId, postText, { parse_mode: "Markdown" });
             }
             await bot!.sendMessage(chatId, "✅ *Дякуємо!* Ваш відгук опубліковано в каналі 🙏", { parse_mode: "Markdown" });
           } catch (err) {
