@@ -306,6 +306,7 @@ async function notifyAdmins(
 }
 
 const userAwaitingCustomStars: Map<string, boolean> = new Map();
+const userAwaitingFeedback: Map<string, string> = new Map();
 
 if (bot) {
   bot.onText(/\/start/, async (msg) => {
@@ -351,6 +352,36 @@ if (bot) {
           chatId,
           "✅ Ваше повідомлення передано в підтримку.\n\nЩоб надіслати ще одне — натисніть кнопку «↩️ Відповісти адміну» знову."
         );
+        return;
+      }
+
+      // Handle feedback submission
+      if (userAwaitingFeedback.has(userId)) {
+        userAwaitingFeedback.delete(userId);
+        const channelUsername = await getSetting("verification_channel");
+        if (channelUsername) {
+          const channelId = normalizeChannel(channelUsername);
+          const name = msg.from?.first_name ?? "Покупець";
+          const tag = msg.from?.username ? ` (@${msg.from.username})` : "";
+          const reviewText = msg.text ?? msg.caption ?? "";
+          const header = `⭐ *Відгук від ${name}${tag}*${reviewText ? `\n\n${reviewText}` : ""}`;
+          try {
+            if (msg.photo) {
+              const fileId = msg.photo[msg.photo.length - 1].file_id;
+              await bot!.sendPhoto(channelId, fileId, { caption: header, parse_mode: "Markdown" });
+            } else if (msg.document) {
+              await bot!.sendDocument(channelId, msg.document.file_id, { caption: header, parse_mode: "Markdown" });
+            } else if (msg.text) {
+              await bot!.sendMessage(channelId, header, { parse_mode: "Markdown" });
+            }
+            await bot!.sendMessage(chatId, "✅ *Дякуємо!* Ваш відгук опубліковано в каналі 🙏", { parse_mode: "Markdown" });
+          } catch (err) {
+            logger.warn({ err }, "Failed to post review to channel");
+            await bot!.sendMessage(chatId, "⚠️ Не вдалося опублікувати відгук. Спробуйте пізніше.");
+          }
+        } else {
+          await bot!.sendMessage(chatId, "⚠️ Канал для відгуків ще не налаштований адміністратором.");
+        }
         return;
       }
 
@@ -471,6 +502,18 @@ if (bot) {
         return;
       }
 
+      if (data === "leave_review") {
+        const userId = String(query.from.id);
+        userAwaitingFeedback.set(userId, "pending");
+        await bot!.answerCallbackQuery(query.id, { text: "✍️ Напишіть свій відгук" });
+        await bot!.sendMessage(
+          chatId!,
+          `✍️ *Залишити відгук*\n\nНадішліть текст, фото або обидва разом — ми опублікуємо ваш відгук у каналі.\n\n_Ви можете описати свої враження від покупки та додати скріншот отриманих зірок._`,
+          { parse_mode: "Markdown" }
+        );
+        return;
+      }
+
       if (data.startsWith("complete_")) {
         const orderNumber = data.replace("complete_", "");
         await db.update(ordersTable).set({ status: "completed", updatedAt: new Date() }).where(eq(ordersTable.orderNumber, orderNumber));
@@ -479,8 +522,13 @@ if (bot) {
           try {
             await bot!.sendMessage(
               Number(orders[0].telegramUserId),
-              `🎉 *Замовлення виконано!*\n\n📋 Замовлення: \`${orderNumber}\`\n⭐ Зірки (${orders[0].starsAmount}) надіслані на ваш акаунт!\n\nДякуємо за покупку! 🙏`,
-              { parse_mode: "Markdown" }
+              `🎉 *Замовлення виконано!*\n\n📋 Замовлення: \`${orderNumber}\`\n⭐ Зірки (${orders[0].starsAmount}) надіслані на ваш акаунт!\n\nДякуємо за покупку! 🙏\n\n💬 Будемо вдячні, якщо ви залишите відгук — це займе лише хвилину!`,
+              {
+                parse_mode: "Markdown",
+                reply_markup: {
+                  inline_keyboard: [[{ text: "💬 Залишити відгук", callback_data: "leave_review" }]],
+                },
+              }
             );
           } catch {}
         }
