@@ -488,7 +488,18 @@ if (bot) {
         const userId = String(query.from.id);
         userAwaitingCustomStars.set(userId, true);
         await bot!.answerCallbackQuery(query.id);
-        await bot!.sendMessage(chatId!, `✏️ Введіть кількість зірок, яку хочете купити (мінімум 10):\n\n_Ціна розраховується: кількість × 0.80 грн_`, { parse_mode: "Markdown" });
+        await bot!.sendMessage(chatId!, `✏️ Введіть кількість зірок, яку хочете купити (мінімум 10):\n\n_Ціна розраховується: кількість × 0.80 грн_`, {
+          parse_mode: "Markdown",
+          reply_markup: { inline_keyboard: [[{ text: "❌ Скасувати", callback_data: "cancel_custom" }]] },
+        });
+        return;
+      }
+
+      if (data === "cancel_custom") {
+        const userId = String(query.from.id);
+        userAwaitingCustomStars.delete(userId);
+        await bot!.answerCallbackQuery(query.id, { text: "Скасовано" });
+        await sendBuyMenu(chatId!);
         return;
       }
 
