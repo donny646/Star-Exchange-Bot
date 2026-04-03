@@ -16,6 +16,10 @@ export const customerToAdmin: Map<string, number> = new Map();
 // Customers who pressed "Відповісти адміну" and are ready to send one message
 export const customerReplyMode: Set<string> = new Set();
 
+function esc(text: string | null | undefined): string {
+  return (text ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+}
+
 async function getSetting(key: string): Promise<string | null> {
   const result = await db
     .select()
@@ -136,12 +140,12 @@ async function sendNewOrders(bot: TelegramBot, chatId: number) {
     });
 
     const text =
-      `📋 \`${order.orderNumber}\`\n` +
-      `👤 ${user} (ID: \`${order.telegramUserId}\`)\n` +
+      `📋 <code>${esc(order.orderNumber)}</code>\n` +
+      `👤 ${esc(user)} (ID: <code>${esc(order.telegramUserId)}</code>)\n` +
       `⭐ ${order.starsAmount} зірок • ${order.priceUah} грн\n` +
       `📊 ${statusLabel}\n` +
       `📅 ${date}` +
-      (order.proofCaption ? `\n💬 ${order.proofCaption}` : "");
+      (order.proofCaption ? `\n💬 ${esc(order.proofCaption)}` : "");
 
     const keyboard = {
       inline_keyboard: [
@@ -158,16 +162,16 @@ async function sendNewOrders(bot: TelegramBot, chatId: number) {
     try {
       if (order.proofFileId) {
         try {
-          await bot.sendPhoto(chatId, order.proofFileId, { caption: text, parse_mode: "Markdown", reply_markup: keyboard });
+          await bot.sendPhoto(chatId, order.proofFileId, { caption: text, parse_mode: "HTML", reply_markup: keyboard });
         } catch {
-          await bot.sendDocument(chatId, order.proofFileId, { caption: text, parse_mode: "Markdown", reply_markup: keyboard });
+          await bot.sendDocument(chatId, order.proofFileId, { caption: text, parse_mode: "HTML", reply_markup: keyboard });
         }
       } else {
-        await bot.sendMessage(chatId, text, { parse_mode: "Markdown", reply_markup: keyboard });
+        await bot.sendMessage(chatId, text, { parse_mode: "HTML", reply_markup: keyboard });
       }
     } catch (err) {
       logger.warn({ err, orderId: order.id }, "Failed to send order card to admin");
-      await bot.sendMessage(chatId, text, { parse_mode: "Markdown", reply_markup: keyboard });
+      await bot.sendMessage(chatId, text, { parse_mode: "HTML", reply_markup: keyboard });
     }
   }
 

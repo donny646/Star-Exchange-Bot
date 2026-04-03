@@ -246,6 +246,10 @@ async function handleProofMedia(
   }
 }
 
+function esc(text: string | null | undefined): string {
+  return (text ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+}
+
 async function notifyAdmins(
   orderNumber: string,
   fileId: string | null,
@@ -278,7 +282,7 @@ async function notifyAdmins(
     if (!order[0]) return;
     const o = order[0];
 
-    const text = `🔔 *Нова оплата!*\n\n📋 Замовлення: \`${orderNumber}\`\n👤 Користувач: ${firstName ?? ""} ${username ? "@" + username : ""} (ID: ${userId})\n⭐ Зірок: ${o.starsAmount}\n💰 Сума: ${o.priceUah} грн${caption ? `\n\n💬 Коментар: ${caption}` : ""}`;
+    const text = `🔔 <b>Нова оплата!</b>\n\n📋 Замовлення: <code>${esc(orderNumber)}</code>\n👤 Користувач: ${esc(firstName)} ${username ? esc("@" + username) : ""} (ID: <code>${esc(userId)}</code>)\n⭐ Зірок: ${o.starsAmount}\n💰 Сума: ${o.priceUah} грн${caption ? `\n\n💬 Коментар: ${esc(caption)}` : ""}`;
 
     const keyboard = {
       inline_keyboard: [
@@ -296,12 +300,12 @@ async function notifyAdmins(
       try {
         if (fileId) {
           try {
-            await bot.sendPhoto(target, fileId, { caption: text, parse_mode: "Markdown", reply_markup: keyboard });
+            await bot.sendPhoto(target, fileId, { caption: text, parse_mode: "HTML", reply_markup: keyboard });
           } catch {
-            await bot.sendDocument(target, fileId, { caption: text, parse_mode: "Markdown", reply_markup: keyboard });
+            await bot.sendDocument(target, fileId, { caption: text, parse_mode: "HTML", reply_markup: keyboard });
           }
         } else {
-          await bot.sendMessage(target, text, { parse_mode: "Markdown", reply_markup: keyboard });
+          await bot.sendMessage(target, text, { parse_mode: "HTML", reply_markup: keyboard });
         }
       } catch (err) {
         logger.warn({ err, target }, "Failed to notify admin");
