@@ -1,7 +1,7 @@
 import TelegramBot from "node-telegram-bot-api";
 import { db } from "@workspace/db";
 import { ordersTable, settingsTable } from "@workspace/db";
-import { eq, desc, or, count } from "drizzle-orm";
+import { eq, desc, count } from "drizzle-orm";
 import { logger } from "../lib/logger";
 
 type AdminStateData =
@@ -105,12 +105,7 @@ async function sendNewOrders(bot: TelegramBot, chatId: number) {
   const orders = await db
     .select()
     .from(ordersTable)
-    .where(
-      or(
-        eq(ordersTable.status, "pending"),
-        eq(ordersTable.status, "proof_submitted")
-      )
-    )
+    .where(eq(ordersTable.status, "proof_submitted"))
     .orderBy(desc(ordersTable.createdAt));
 
   if (orders.length === 0) {
