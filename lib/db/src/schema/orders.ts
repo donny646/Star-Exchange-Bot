@@ -1,4 +1,4 @@
-import { pgTable, serial, text, integer, timestamp, pgEnum } from "drizzle-orm/pg-core";
+import { pgTable, serial, text, integer, real, timestamp, pgEnum } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod/v4";
 
@@ -16,7 +16,7 @@ export const ordersTable = pgTable("orders", {
   telegramUsername: text("telegram_username"),
   telegramFirstName: text("telegram_first_name"),
   starsAmount: integer("stars_amount").notNull(),
-  priceUah: integer("price_uah").notNull(),
+  priceUah: real("price_uah").notNull(),
   status: orderStatusEnum("status").notNull().default("pending"),
   proofFileId: text("proof_file_id"),
   proofCaption: text("proof_caption"),

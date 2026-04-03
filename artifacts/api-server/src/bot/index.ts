@@ -52,8 +52,8 @@ if (bot) {
 
 const STAR_PACKAGES = [
   { stars: 50, price: 40 },
-  { stars: 100, price: 78 },
-  { stars: 200, price: 156 },
+  { stars: 100, price: 80 },
+  { stars: 200, price: 160 },
   { stars: 500, price: 390 },
 ];
 
@@ -435,7 +435,7 @@ if (bot) {
           return;
         }
         userAwaitingCustomStars.delete(userId);
-        const price = Math.ceil(stars * 0.80);
+        const price = Math.round(stars * 0.80 * 100) / 100;
         await sendOrderDetails(chatId, stars, price, userId, msg.from?.username ?? null, msg.from?.first_name ?? null);
         return;
       }
