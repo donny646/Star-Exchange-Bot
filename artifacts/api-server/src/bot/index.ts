@@ -407,7 +407,7 @@ if (bot) {
           return;
         }
         userAwaitingCustomStars.delete(userId);
-        const price = Math.ceil(stars * 0.78);
+        const price = Math.ceil(stars * 0.80);
         await sendOrderDetails(chatId, stars, price, userId, msg.from?.username ?? null, msg.from?.first_name ?? null);
         return;
       }
@@ -488,7 +488,7 @@ if (bot) {
         const userId = String(query.from.id);
         userAwaitingCustomStars.set(userId, true);
         await bot!.answerCallbackQuery(query.id);
-        await bot!.sendMessage(chatId!, `✏️ Введіть кількість зірок, яку хочете купити (мінімум 10):\n\n_Ціна розраховується: кількість × 0.78 грн_`, { parse_mode: "Markdown" });
+        await bot!.sendMessage(chatId!, `✏️ Введіть кількість зірок, яку хочете купити (мінімум 10):\n\n_Ціна розраховується: кількість × 0.80 грн_`, { parse_mode: "Markdown" });
         return;
       }
 
