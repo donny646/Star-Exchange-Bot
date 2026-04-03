@@ -155,17 +155,19 @@ async function sendNewOrders(bot: TelegramBot, chatId: number) {
       ],
     };
 
-    if (order.proofFileId) {
-      await bot.sendPhoto(chatId, order.proofFileId, {
-        caption: text,
-        parse_mode: "Markdown",
-        reply_markup: keyboard,
-      });
-    } else {
-      await bot.sendMessage(chatId, text, {
-        parse_mode: "Markdown",
-        reply_markup: keyboard,
-      });
+    try {
+      if (order.proofFileId) {
+        try {
+          await bot.sendPhoto(chatId, order.proofFileId, { caption: text, parse_mode: "Markdown", reply_markup: keyboard });
+        } catch {
+          await bot.sendDocument(chatId, order.proofFileId, { caption: text, parse_mode: "Markdown", reply_markup: keyboard });
+        }
+      } else {
+        await bot.sendMessage(chatId, text, { parse_mode: "Markdown", reply_markup: keyboard });
+      }
+    } catch (err) {
+      logger.warn({ err, orderId: order.id }, "Failed to send order card to admin");
+      await bot.sendMessage(chatId, text, { parse_mode: "Markdown", reply_markup: keyboard });
     }
   }
 

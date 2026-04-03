@@ -268,7 +268,10 @@ async function notifyAdmins(
     }
   }
 
-  if (targets.size === 0) return;
+  if (targets.size === 0) {
+    logger.warn("notifyAdmins: no admin targets configured — set admin_chat_id or admin_whitelist in settings");
+    return;
+  }
 
   try {
     const order = await db.select().from(ordersTable).where(eq(ordersTable.orderNumber, orderNumber)).limit(1);
@@ -292,7 +295,11 @@ async function notifyAdmins(
     for (const target of targets) {
       try {
         if (fileId) {
-          await bot.sendPhoto(target, fileId, { caption: text, parse_mode: "Markdown", reply_markup: keyboard });
+          try {
+            await bot.sendPhoto(target, fileId, { caption: text, parse_mode: "Markdown", reply_markup: keyboard });
+          } catch {
+            await bot.sendDocument(target, fileId, { caption: text, parse_mode: "Markdown", reply_markup: keyboard });
+          }
         } else {
           await bot.sendMessage(target, text, { parse_mode: "Markdown", reply_markup: keyboard });
         }
