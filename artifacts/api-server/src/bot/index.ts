@@ -386,7 +386,10 @@ if (bot) {
       } else if (text === "💬 Відгуки") {
         const channelUsername = await getSetting("verification_channel");
         if (channelUsername) {
-          const channelLink = `https://t.me/${channelUsername.replace("@", "")}`;
+          const normalized = normalizeChannel(channelUsername).replace("@", "");
+          const channelLink = /^-?\d+$/.test(normalized)
+            ? `https://t.me/c/${normalized.replace("-100", "")}`
+            : `https://t.me/${normalized}`;
           await bot!.sendMessage(chatId, `💬 *Відгуки наших клієнтів*\n\nОзнайомтесь із відгуками покупців: ${channelLink}`, { parse_mode: "Markdown" });
         } else {
           await bot!.sendMessage(chatId, `💬 *Відгуки*\n\nПосилання на канал з відгуками буде додане незабаром.`, { parse_mode: "Markdown" });
