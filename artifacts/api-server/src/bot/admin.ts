@@ -484,12 +484,19 @@ export async function handleAdminCallback(
         try {
           await bot.sendMessage(
             Number(updated[0].telegramUserId),
-            `🎉 *Замовлення виконано!*\n\n📋 Замовлення: \`${updated[0].orderNumber}\`\n⭐ Зірки (${updated[0].starsAmount}) надіслані на ваш акаунт!\n\nДякуємо за покупку! 🙏`,
-            { parse_mode: "Markdown" }
+            `🎉 *Замовлення виконано!*\n\n📋 Замовлення: \`${updated[0].orderNumber}\`\n⭐ Зірки (${updated[0].starsAmount}) надіслані на ваш акаунт!\n\nДякуємо за покупку! 🙏\n\n💬 Будемо вдячні, якщо ви залишите відгук — це займе лише хвилину!`,
+            {
+              parse_mode: "Markdown",
+              reply_markup: {
+                inline_keyboard: [[{ text: "💬 Залишити відгук", callback_data: `leave_review_${updated[0].starsAmount}` }]],
+              },
+            }
           );
         } catch {}
       }
-      await bot.sendMessage(chatId, `✅ Замовлення виконано!`);
+      await bot.sendMessage(chatId, `✅ Замовлення виконано!`, {
+        reply_markup: { inline_keyboard: [[{ text: "🔙 Назад до замовлень", callback_data: "adm_orders_new" }]] },
+      });
     } else if (data.startsWith("adm_cancel_")) {
       const id = Number(data.replace("adm_cancel_", ""));
       const updated = await db
@@ -506,7 +513,9 @@ export async function handleAdminCallback(
           );
         } catch {}
       }
-      await bot.sendMessage(chatId, `❌ Замовлення скасовано.`);
+      await bot.sendMessage(chatId, `❌ Замовлення скасовано.`, {
+        reply_markup: { inline_keyboard: [[{ text: "🔙 Назад до замовлень", callback_data: "adm_orders_new" }]] },
+      });
     }
   } catch (err) {
     logger.error({ err }, "Error in admin callback");
