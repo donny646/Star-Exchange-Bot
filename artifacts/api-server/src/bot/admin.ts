@@ -426,6 +426,7 @@ export async function handleAdminCallback(
   }
 
   await bot.answerCallbackQuery(query.id);
+  try { await bot.deleteMessage(chatId, query.message!.message_id); } catch {}
 
   try {
     if (data === "adm_menu") {
