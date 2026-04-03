@@ -562,6 +562,9 @@ if (bot) {
           } catch {}
         }
         await bot!.answerCallbackQuery(query.id, { text: "✅ Замовлення виконано!" });
+        try {
+          await bot!.deleteMessage(query.message!.chat.id, query.message!.message_id);
+        } catch {}
         return;
       }
 
@@ -579,6 +582,9 @@ if (bot) {
           } catch {}
         }
         await bot!.answerCallbackQuery(query.id, { text: "❌ Замовлення скасовано" });
+        try {
+          await bot!.deleteMessage(query.message!.chat.id, query.message!.message_id);
+        } catch {}
         return;
       }
 
