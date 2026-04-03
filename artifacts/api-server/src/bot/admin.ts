@@ -107,8 +107,7 @@ async function sendNewOrders(bot: TelegramBot, chatId: number) {
         eq(ordersTable.status, "proof_submitted")
       )
     )
-    .orderBy(desc(ordersTable.createdAt))
-    .limit(10);
+    .orderBy(desc(ordersTable.createdAt));
 
   if (orders.length === 0) {
     await bot.sendMessage(chatId, "✅ Нових замовлень немає.", {
@@ -182,8 +181,7 @@ async function sendCompletedOrders(bot: TelegramBot, chatId: number) {
     .select()
     .from(ordersTable)
     .where(eq(ordersTable.status, "completed"))
-    .orderBy(desc(ordersTable.createdAt))
-    .limit(10);
+    .orderBy(desc(ordersTable.createdAt));
 
   if (orders.length === 0) {
     await bot.sendMessage(chatId, "Виконаних замовлень ще немає.", {
@@ -207,7 +205,7 @@ async function sendCompletedOrders(bot: TelegramBot, chatId: number) {
 
   await bot.sendMessage(
     chatId,
-    `✅ *Останні виконані замовлення*\n\n${lines.join("\n")}`,
+    `✅ *Виконані замовлення* (${orders.length})\n\n${lines.join("\n")}`,
     {
       parse_mode: "Markdown",
       reply_markup: {
