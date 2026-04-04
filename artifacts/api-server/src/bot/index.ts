@@ -388,19 +388,19 @@ if (bot) {
           const dateStr = `${day}.${month}.${year}`;
 
           const name = msg.from?.first_name ?? "Покупець";
-          const tag = msg.from?.username ? ` (@${msg.from.username})` : "";
+          const tag = msg.from?.username ? ` (@${esc(msg.from.username)})` : "";
           const reviewText = msg.text ?? msg.caption ?? "";
 
-          const postText = `📊 №${feedbackNumber} ⭐️\n\n🆔 Клієнт: ${name}${tag}\n📝 Коментар: ${reviewText}\n\nДата: ${dateStr}\n\nКуплено: ${starsAmount} ⭐️`;
+          const postText = `📊 №${feedbackNumber} ⭐️\n\n🆔 Клієнт: ${esc(name)}${tag}\n📝 Коментар: ${esc(reviewText)}\n\nДата: ${dateStr}\n\nКуплено: ${starsAmount} ⭐️`;
 
           try {
             if (msg.photo) {
               const fileId = msg.photo[msg.photo.length - 1].file_id;
-              await bot!.sendPhoto(channelId, fileId, { caption: postText, parse_mode: "Markdown" });
+              await bot!.sendPhoto(channelId, fileId, { caption: postText, parse_mode: "HTML" });
             } else if (msg.document) {
-              await bot!.sendDocument(channelId, msg.document.file_id, { caption: postText, parse_mode: "Markdown" });
+              await bot!.sendDocument(channelId, msg.document.file_id, { caption: postText, parse_mode: "HTML" });
             } else {
-              await bot!.sendMessage(channelId, postText, { parse_mode: "Markdown" });
+              await bot!.sendMessage(channelId, postText, { parse_mode: "HTML" });
             }
             await bot!.sendMessage(chatId, "✅ *Дякуємо!* Ваш відгук опубліковано в каналі 🙏", { parse_mode: "Markdown" });
           } catch (err) {
